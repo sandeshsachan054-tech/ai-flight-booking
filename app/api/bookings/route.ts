@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import clientPromise from '../../..//lib/mongodb';
+import clientPromise from '@/lib/mongodb';
 
 // Fetch all bookings from DB
 export async function GET() {

@@ -22,7 +22,7 @@ Return raw JSON only without markdown.`;
 
     const extractResponse = await groq.chat.completions.create({
       messages: [{ role: 'user', content: extractPrompt }],
-      model: 'openai/gpt-oss-safeguard-20b',
+      model: 'openai/gpt-oss-120b',
       temperature: 0.1,
     });
 

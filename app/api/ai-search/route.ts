@@ -1,32 +1,44 @@
-import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import Groq from "groq-sdk";
+import { NextResponse } from "next/server";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
+});
 
 export async function POST(req: Request) {
   try {
     const { query } = await req.json();
 
     if (!query) {
-      return NextResponse.json({ error: 'Query is required' }, { status: 400 });
+      return NextResponse.json({ error: "Query is required" }, { status: 400 });
     }
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-    const prompt = `You are a flight search assistant. Extract flight search details from this query: "${query}".
-Return ONLY a valid JSON object matching this schema, without markdown blocks:
+    const extractPrompt = `You are a flight search assistant. Extract flight search details from: "${query}".
+Return ONLY a valid JSON object:
 {
-  "from": "3-letter airport code or city name in uppercase (e.g. DEL, BOM, BLR, GOI, DXB)",
-  "to": "3-letter airport code or city name in uppercase",
-  "passengers": number (default 1)
-}`;
+  "from": "3-letter origin IATA (e.g. DEL, BOM, BLR, DXB, LHR)",
+  "to": "3-letter destination IATA",
+  "date": "YYYY-MM-DD"
+}
+Return raw JSON only without markdown.`;
 
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text().trim().replace(/json|/g, '');
-    const parsedData = JSON.parse(responseText);
+    const extractResponse = await groq.chat.completions.create({
+      messages: [{ role: "user", content: extractPrompt }],
+      model: "groq/compound-mini", // JSON extraction ke liye sabse reliable aur ultra-fast model
+      response_format: { type: "json_object" },
+      temperature: 0.1,
+    });
 
-    return NextResponse.json(parsedData);
+    const parsedData = JSON.parse(
+      extractResponse.choices[0]?.message?.content || "{}"
+    );
+
+    return NextResponse.json({ success: true, data: parsedData });
   } catch (err: any) {
-    console.error('AI Parse Error:', err);
-    return NextResponse.json({ error: 'Failed to process natural language query' }, { status: 500 });
+    console.error("Flight Search AI Error:", err);
+    return NextResponse.json(
+      { error: err.message || "Failed to process search query" },
+      { status: 500 }
+    );
   }
 }

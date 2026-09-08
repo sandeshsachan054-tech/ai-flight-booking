@@ -43,6 +43,51 @@ const ALL_SEATS = [
   ['5A', '5B', '5C', '5D', '5E', '5F'],
 ];
 
+// Helper: Dynamic flight list generator based on extracted AI route
+const generateFlightsForRoute = (from: string, to: string, prefix: 'out' | 'ret'): Flight[] => {
+  return [
+    {
+      id: `${prefix}_1`,
+      airline: 'IndiGo',
+      flightNo: prefix === 'out' ? '6E-204' : '6E-512',
+      from,
+      to,
+      dep: prefix === 'out' ? '08:30 AM' : '09:00 AM',
+      arr: prefix === 'out' ? '10:45 AM' : '11:15 AM',
+      duration: '2h 15m',
+      durationMinutes: 135,
+      price: '₹4,850',
+      numericPrice: 4850,
+    },
+    {
+      id: `${prefix}_2`,
+      airline: 'Air India',
+      flightNo: prefix === 'out' ? 'AI-102' : 'AI-105',
+      from,
+      to,
+      dep: prefix === 'out' ? '11:00 AM' : '04:00 PM',
+      arr: prefix === 'out' ? '01:15 PM' : '06:15 PM',
+      duration: '2h 15m',
+      durationMinutes: 135,
+      price: '₹5,420',
+      numericPrice: 5420,
+    },
+    {
+      id: `${prefix}_3`,
+      airline: prefix === 'out' ? 'Vistara' : 'Akasa Air',
+      flightNo: prefix === 'out' ? 'UK-955' : 'QP-144',
+      from,
+      to,
+      dep: prefix === 'out' ? '06:00 PM' : '08:30 PM',
+      arr: prefix === 'out' ? '08:10 PM' : '10:40 PM',
+      duration: '2h 10m',
+      durationMinutes: 130,
+      price: prefix === 'out' ? '₹6,150' : '₹4,300',
+      numericPrice: prefix === 'out' ? 6150 : 4300,
+    },
+  ];
+};
+
 export default function Home() {
   const [tripType, setTripType] = useState<'one-way' | 'round-trip'>('one-way');
   const [searchQuery, setSearchQuery] = useState('');
@@ -51,7 +96,15 @@ export default function Home() {
   const [isBooking, setIsBooking] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
-  // Selected Flights for Round-Trip
+  // Dynamic Route States
+  const [origin, setOrigin] = useState<string>('DEL');
+  const [destination, setDestination] = useState<string>('BOM');
+
+  // Flight Catalogs (Dynamic)
+  const [outboundCatalog, setOutboundCatalog] = useState<Flight[]>(() => generateFlightsForRoute('DEL', 'BOM', 'out'));
+  const [returnCatalog, setReturnCatalog] = useState<Flight[]>(() => generateFlightsForRoute('BOM', 'DEL', 'ret'));
+
+  // Selected Flights
   const [selectedOutbound, setSelectedOutbound] = useState<Flight | null>(null);
   const [selectedReturn, setSelectedReturn] = useState<Flight | null>(null);
 
@@ -65,12 +118,12 @@ export default function Home() {
 
   // Dynamic Passengers & Contact
   const [passengers, setPassengers] = useState<Passenger[]>([
-    { name: 'Sandesh Kumar', age: '24', outboundSeat: '1A', returnSeat: '1F' }
+    { name: 'Sandesh Kumar', age: '24', outboundSeat: '1A', returnSeat: '1F' },
   ]);
   const [contactEmail, setContactEmail] = useState('sandesh@example.com');
   const [contactPhone, setContactPhone] = useState('9876543210');
 
-  // Bookings State (Database + LocalStorage fallback)
+  // Bookings History State
   const [history, setHistory] = useState<BookingRecord[]>([]);
 
   const fetchBookings = async () => {
@@ -86,7 +139,9 @@ export default function Home() {
     }
     const saved = localStorage.getItem('flight_bookings');
     if (saved) {
-      try { setHistory(JSON.parse(saved)); } catch (e) {}
+      try {
+        setHistory(JSON.parse(saved));
+      } catch (e) {}
     }
   };
 
@@ -109,18 +164,6 @@ export default function Home() {
       console.error('Database save failed:', e);
     }
   };
-
-  const outboundCatalog: Flight[] = [
-    { id: 'out_1', airline: 'IndiGo', flightNo: '6E-204', from: 'DEL', to: 'BOM', dep: '08:30 AM', arr: '10:45 AM', duration: '2h 15m', durationMinutes: 135, price: '₹4,850', numericPrice: 4850 },
-    { id: 'out_2', airline: 'Air India', flightNo: 'AI-102', from: 'DEL', to: 'BOM', dep: '11:00 AM', arr: '01:15 PM', duration: '2h 15m', durationMinutes: 135, price: '₹5,420', numericPrice: 5420 },
-    { id: 'out_3', airline: 'Vistara', flightNo: 'UK-955', from: 'DEL', to: 'BOM', dep: '06:00 PM', arr: '08:10 PM', duration: '2h 10m', durationMinutes: 130, price: '₹6,150', numericPrice: 6150 },
-  ];
-
-  const returnCatalog: Flight[] = [
-    { id: 'ret_1', airline: 'IndiGo', flightNo: '6E-512', from: 'BOM', to: 'DEL', dep: '09:00 AM', arr: '11:15 AM', duration: '2h 15m', durationMinutes: 135, price: '₹4,650', numericPrice: 4650 },
-    { id: 'ret_2', airline: 'Air India', flightNo: 'AI-105', from: 'BOM', to: 'DEL', dep: '04:00 PM', arr: '06:15 PM', duration: '2h 15m', durationMinutes: 135, price: '₹5,200', numericPrice: 5200 },
-    { id: 'ret_3', airline: 'Akasa Air', flightNo: 'QP-144', from: 'BOM', to: 'DEL', dep: '08:30 PM', arr: '10:40 PM', duration: '2h 10m', durationMinutes: 130, price: '₹4,300', numericPrice: 4300 },
-  ];
 
   const addPassenger = () => setPassengers([...passengers, { name: '', age: '', outboundSeat: '', returnSeat: '' }]);
   const removePassenger = (index: number) => {
@@ -162,16 +205,45 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: text }),
       });
-      const parsed = await res.json();
-      if (parsed.passengers && parsed.passengers > 0) {
+      const responseData = await res.json();
+      const extracted = responseData.data || responseData;
+
+      // 1. Update Origin & Destination
+      const newFrom = extracted.from ? extracted.from.toUpperCase() : origin;
+      const newTo = extracted.to ? extracted.to.toUpperCase() : destination;
+
+      setOrigin(newFrom);
+      setDestination(newTo);
+
+      // 2. Fetch LIVE Real Flights from API Route
+      const [outRes, retRes] = await Promise.all([
+        fetch(`/api/flights?from=${newFrom}&to=${newTo}`).then((r) => r.json()),
+        fetch(`/api/flights?from=${newTo}&to=${newFrom}`).then((r) => r.json()),
+      ]);
+
+      const liveOutbound = outRes.flights || [];
+      const liveReturn = retRes.flights || [];
+
+      setOutboundCatalog(liveOutbound);
+      setReturnCatalog(liveReturn);
+      setSelectedOutbound(liveOutbound[0] || null);
+      setSelectedReturn(liveReturn[0] || null);
+      // 3. Handle passenger count
+      if (extracted.passengers && Number(extracted.passengers) > 0) {
+        const count = Number(extracted.passengers);
         const newPassList: Passenger[] = [];
-        for (let i = 0; i < parsed.passengers; i++) {
+        for (let i = 0; i < count; i++) {
           newPassList.push(passengers[i] || { name: '', age: '', outboundSeat: '', returnSeat: '' });
         }
         setPassengers(newPassList);
       }
+
+      // 4. Handle round trip auto-toggle if mentioned
+      if (text.toLowerCase().includes('round') || text.toLowerCase().includes('return')) {
+        setTripType('round-trip');
+      }
     } catch (e) {
-      console.error(e);
+      console.error('AI Search error:', e);
     } finally {
       setIsSearchingAI(false);
     }
@@ -414,9 +486,10 @@ export default function Home() {
                   <span className="text-xs font-mono text-gray-400 w-4">{rIdx + 1}</span>
                   <div className="flex gap-1">
                     {row.slice(0, 3).map((seat) => {
-                      const isSelected = seatModalType === 'outbound'
-                        ? passengers[activePassengerSeatIndex]?.outboundSeat === seat
-                        : passengers[activePassengerSeatIndex]?.returnSeat === seat;
+                      const isSelected =
+                        seatModalType === 'outbound'
+                          ? passengers[activePassengerSeatIndex]?.outboundSeat === seat
+                          : passengers[activePassengerSeatIndex]?.returnSeat === seat;
                       return (
                         <button
                           key={seat}
@@ -433,9 +506,10 @@ export default function Home() {
                   <div className="w-3" />
                   <div className="flex gap-1">
                     {row.slice(3, 6).map((seat) => {
-                      const isSelected = seatModalType === 'outbound'
-                        ? passengers[activePassengerSeatIndex]?.outboundSeat === seat
-                        : passengers[activePassengerSeatIndex]?.returnSeat === seat;
+                      const isSelected =
+                        seatModalType === 'outbound'
+                          ? passengers[activePassengerSeatIndex]?.outboundSeat === seat
+                          : passengers[activePassengerSeatIndex]?.returnSeat === seat;
                       return (
                         <button
                           key={seat}
@@ -467,7 +541,10 @@ export default function Home() {
       <section className="mt-8 flex flex-col items-center px-4">
         <div className="flex bg-gray-200 p-1 rounded-xl mb-4">
           <button
-            onClick={() => { setTripType('one-way'); setSelectedReturn(null); }}
+            onClick={() => {
+              setTripType('one-way');
+              setSelectedReturn(null);
+            }}
             className={`px-5 py-2 text-xs font-bold rounded-lg transition ${tripType === 'one-way' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600'}`}
           >
             One-Way
@@ -610,22 +687,39 @@ export default function Home() {
         {/* Flight Selection Column */}
         <div className="md:col-span-2 space-y-6">
           <div>
-            <h3 className="font-bold text-gray-900 text-lg mb-2">1. Select Outbound Flight (DEL ➔ BOM)</h3>
+            <h3 className="font-bold text-gray-900 text-lg mb-2">
+              1. Select Outbound Flight ({origin} ➔ {destination})
+            </h3>
             <div className="space-y-3">
               {processedOutbound.map((flight) => {
-                const isSelected = selectedOutbound?.id === flight.id || (!selectedOutbound && flight.id === 'out_1');
+                const isSelected = selectedOutbound?.id === flight.id || (!selectedOutbound && flight.id === outboundCatalog[0]?.id);
                 return (
                   <div
                     key={flight.id}
                     onClick={() => setSelectedOutbound(flight)}
-                    className={`p-4 rounded-2xl border cursor-pointer transition flex justify-between items-center ${isSelected ? 'border-blue-600 bg-blue-50/40 shadow-sm' : 'bg-white hover:border-gray-300'}`}
+                    className={`p-4 rounded-2xl border cursor-pointer transition flex justify-between items-center ${
+                      isSelected ? 'border-blue-600 bg-blue-50/40 shadow-sm' : 'bg-white hover:border-gray-300'
+                    }`}
                   >
                     <div>
                       <span className="font-bold text-gray-900">{flight.airline} ({flight.flightNo})</span>
                       <div className="text-xs text-gray-500 mt-1">{flight.dep} - {flight.arr} • {flight.duration}</div>
                     </div>
-                    <div className="text-right font-black text-gray-900">
-                      ₹{flight.numericPrice.toLocaleString('en-IN')}
+                    <div className="text-right flex flex-col items-end gap-2">
+                      <span className="font-black text-gray-900 text-base">
+                        ₹{flight.numericPrice.toLocaleString('en-IN')}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedOutbound(flight);
+                          handleCheckout();
+                        }}
+                        disabled={isBooking}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition"
+                      >
+                        Book Now
+                      </button>
                     </div>
                   </div>
                 );
@@ -635,22 +729,39 @@ export default function Home() {
 
           {tripType === 'round-trip' && (
             <div>
-              <h3 className="font-bold text-gray-900 text-lg mb-2">2. Select Return Flight (BOM ➔ DEL)</h3>
+              <h3 className="font-bold text-gray-900 text-lg mb-2">
+                2. Select Return Flight ({destination} ➔ {origin})
+              </h3>
               <div className="space-y-3">
                 {processedReturn.map((flight) => {
-                  const isSelected = selectedReturn?.id === flight.id || (!selectedReturn && flight.id === 'ret_1');
+                  const isSelected = selectedReturn?.id === flight.id || (!selectedReturn && flight.id === returnCatalog[0]?.id);
                   return (
                     <div
                       key={flight.id}
                       onClick={() => setSelectedReturn(flight)}
-                      className={`p-4 rounded-2xl border cursor-pointer transition flex justify-between items-center ${isSelected ? 'border-blue-600 bg-blue-50/40 shadow-sm' : 'bg-white hover:border-gray-300'}`}
+                      className={`p-4 rounded-2xl border cursor-pointer transition flex justify-between items-center ${
+                        isSelected ? 'border-blue-600 bg-blue-50/40 shadow-sm' : 'bg-white hover:border-gray-300'
+                      }`}
                     >
                       <div>
                         <span className="font-bold text-gray-900">{flight.airline} ({flight.flightNo})</span>
                         <div className="text-xs text-gray-500 mt-1">{flight.dep} - {flight.arr} • {flight.duration}</div>
                       </div>
-                      <div className="text-right font-black text-gray-900">
-                        ₹{flight.numericPrice.toLocaleString('en-IN')}
+                      <div className="text-right flex flex-col items-end gap-2">
+                        <span className="font-black text-gray-900 text-base">
+                          ₹{flight.numericPrice.toLocaleString('en-IN')}
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedReturn(flight);
+                          }}
+                          className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${
+                            isSelected ? 'bg-green-600 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-800'
+                          }`}
+                        >
+                          {isSelected ? 'Selected' : 'Select'}
+                        </button>
                       </div>
                     </div>
                   );
