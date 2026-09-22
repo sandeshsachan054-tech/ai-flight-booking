@@ -88,6 +88,103 @@ const generateFlightsForRoute = (from: string, to: string, prefix: 'out' | 'ret'
   ];
 };
 
+// UI Calendar Popover Component
+function SimpleCalendar({
+  selectedDate,
+  onSelectDate,
+  minDate,
+}: {
+  selectedDate: string;
+  onSelectDate: (dateStr: string) => void;
+  minDate?: string;
+}) {
+  const initialDate = selectedDate ? new Date(selectedDate) : new Date();
+  const [viewDate, setViewDate] = useState<Date>(
+    isNaN(initialDate.getTime()) ? new Date() : initialDate
+  );
+
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayIndex = new Date(year, month, 1).getDay();
+
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+
+  const handlePrev = () => setViewDate(new Date(year, month - 1, 1));
+  const handleNext = () => setViewDate(new Date(year, month + 1, 1));
+
+  const handleDayClick = (day: number) => {
+    const formattedMonth = String(month + 1).padStart(2, '0');
+    const formattedDay = String(day).padStart(2, '0');
+    const dateStr = `${year}-${formattedMonth}-${formattedDay}`;
+    onSelectDate(dateStr);
+  };
+
+  return (
+    <div className="p-4 bg-white border border-gray-200 rounded-2xl shadow-xl w-72 text-sm select-none z-50">
+      <div className="flex items-center justify-between mb-3 font-bold text-gray-800">
+        <button
+          type="button"
+          onClick={handlePrev}
+          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-600 font-bold"
+        >
+          &lt;
+        </button>
+        <span className="text-sm">
+          {monthNames[month]} {year}
+        </span>
+        <button
+          type="button"
+          onClick={handleNext}
+          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-600 font-bold"
+        >
+          &gt;
+        </button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 text-center font-bold text-gray-400 text-xs mb-2">
+        <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 text-center">
+        {Array.from({ length: firstDayIndex }).map((_, i) => (
+          <div key={`empty-${i}`} />
+        ))}
+        {Array.from({ length: daysInMonth }).map((_, i) => {
+          const day = i + 1;
+          const formattedMonth = String(month + 1).padStart(2, '0');
+          const formattedDay = String(day).padStart(2, '0');
+          const dateStr = `${year}-${formattedMonth}-${formattedDay}`;
+          const isSelected = selectedDate === dateStr;
+          const isDisabled = minDate ? dateStr < minDate : false;
+
+          return (
+            <button
+              key={day}
+              type="button"
+              disabled={isDisabled}
+              onClick={() => handleDayClick(day)}
+              className={`h-8 w-8 rounded-xl flex items-center justify-center text-xs font-semibold transition-all ${
+                isSelected
+                  ? 'bg-blue-600 text-white font-bold shadow'
+                  : isDisabled
+                  ? 'text-gray-300 cursor-not-allowed'
+                  : 'text-gray-700 hover:bg-blue-50 hover:text-blue-600'
+              }`}
+            >
+              {day}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [tripType, setTripType] = useState<'one-way' | 'round-trip'>('one-way');
   const [searchQuery, setSearchQuery] = useState('');
@@ -96,9 +193,13 @@ export default function Home() {
   const [isBooking, setIsBooking] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
-  // Dynamic Route States
+  // Dynamic Route States & Calendar Dates
   const [origin, setOrigin] = useState<string>('DEL');
   const [destination, setDestination] = useState<string>('BOM');
+  const [departureDate, setDepartureDate] = useState<string>('2026-09-10');
+  const [returnDate, setReturnDate] = useState<string>('2026-09-15');
+  const [showDepCalendar, setShowDepCalendar] = useState<boolean>(false);
+  const [showRetCalendar, setShowRetCalendar] = useState<boolean>(false);
 
   // Flight Catalogs (Dynamic)
   const [outboundCatalog, setOutboundCatalog] = useState<Flight[]>(() => generateFlightsForRoute('DEL', 'BOM', 'out'));
@@ -283,11 +384,11 @@ export default function Home() {
     doc.setTextColor(0, 0, 0);
     doc.text('PNR: ' + pnr, 20, 45);
     doc.text('Payment ID: ' + paymentId, 20, 53);
-    doc.text('Outbound: ' + outbound.airline + ' (' + outbound.flightNo + ') ' + outbound.from + ' -> ' + outbound.to + ' (' + outbound.dep + ')', 20, 61);
+    doc.text('Outbound: ' + outbound.airline + ' (' + outbound.flightNo + ') ' + outbound.from + ' -> ' + outbound.to + ' [' + departureDate + ' at ' + outbound.dep + ']', 20, 61);
 
     let y = 69;
     if (ret) {
-      doc.text('Return: ' + ret.airline + ' (' + ret.flightNo + ') ' + ret.from + ' -> ' + ret.to + ' (' + ret.dep + ')', 20, y);
+      doc.text('Return: ' + ret.airline + ' (' + ret.flightNo + ') ' + ret.from + ' -> ' + ret.to + ' [' + (returnDate || departureDate) + ' at ' + ret.dep + ']', 20, y);
       y += 8;
     }
 
@@ -557,7 +658,7 @@ export default function Home() {
           </button>
         </div>
 
-        <div className="w-full max-w-2xl relative flex items-center mb-6 gap-2">
+        <div className="w-full max-w-2xl relative flex items-center mb-4 gap-2">
           <input
             type="text"
             value={searchQuery}
@@ -579,6 +680,66 @@ export default function Home() {
           >
             {isSearchingAI ? 'AI...' : 'Search'}
           </button>
+        </div>
+
+        {/* Full Interactive Calendar Selectors */}
+        <div className="w-full max-w-2xl flex flex-wrap items-center justify-center gap-4 mb-6">
+          {/* Departure Calendar */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setShowDepCalendar(!showDepCalendar);
+                setShowRetCalendar(false);
+              }}
+              className="px-4 py-2.5 bg-white border border-gray-200 hover:border-blue-500 rounded-xl shadow-sm text-xs font-bold text-gray-700 flex items-center gap-2 transition"
+            >
+              <span className="text-blue-600">📅</span>
+              <span>Departure: {departureDate || 'Select Date'}</span>
+            </button>
+
+            {showDepCalendar && (
+              <div className="absolute top-12 left-0 z-50">
+                <SimpleCalendar
+                  selectedDate={departureDate}
+                  onSelectDate={(date) => {
+                    setDepartureDate(date);
+                    setShowDepCalendar(false);
+                  }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Return Calendar (Visible if Round-trip) */}
+          {tripType === 'round-trip' && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRetCalendar(!showRetCalendar);
+                  setShowDepCalendar(false);
+                }}
+                className="px-4 py-2.5 bg-white border border-gray-200 hover:border-blue-500 rounded-xl shadow-sm text-xs font-bold text-gray-700 flex items-center gap-2 transition"
+              >
+                <span className="text-blue-600">📅</span>
+                <span>Return: {returnDate || 'Select Date'}</span>
+              </button>
+
+              {showRetCalendar && (
+                <div className="absolute top-12 left-0 z-50">
+                  <SimpleCalendar
+                    selectedDate={returnDate}
+                    minDate={departureDate}
+                    onSelectDate={(date) => {
+                      setReturnDate(date);
+                      setShowRetCalendar(false);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Filter Bar */}
